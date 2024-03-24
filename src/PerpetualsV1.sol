@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract PerpetualProtocol {
     ERC20 public collateralToken; // The token used as collateral (e.g., USDC)
+    uint256 public maxLeverage = 15; // Maximum allowed leverage
 
     struct Position {
         address trader;
-        uint256 size; // Size of the position
-        uint256 collateral; // Amount of collateral locked
-        bool isOpen; // Flag to check if the position is open
+        uint256 size;
+        uint256 collateral;
+        bool isOpen;
+        bool isLong; // true for long, false for short
     }
 
     mapping(address => Position) public positions;
@@ -19,35 +21,48 @@ contract PerpetualProtocol {
         collateralToken = _collateralToken;
     }
 
-    // Function to open a new position
-    function openPosition(uint256 size, uint256 collateralAmount) external {
-        require(positions[msg.sender].isOpen == false, "Position already open");
+    function openPosition(uint256 size, uint256 collateralAmount, bool isLong) external {
+        require(!positions[msg.sender].isOpen, "Position already open");
         require(collateralToken.transferFrom(msg.sender, address(this), collateralAmount), "Collateral transfer failed");
+        require(size / collateralAmount <= maxLeverage, "Exceeds maximum leverage");
 
         positions[msg.sender] = Position({
             trader: msg.sender,
             size: size,
             collateral: collateralAmount,
-            isOpen: true
+            isOpen: true,
+            isLong: isLong
         });
 
-        // Additional logic to handle position opening
-        // ...
-    }
+        // Additional logic for position opening might include price checks, etc.
+}
 
-    // Function to close an existing position
+
     function closePosition() external {
-        require(positions[msg.sender].isOpen == true, "No open position to close");
+        require(positions[msg.sender].isOpen, "No open position to close");
 
         Position storage position = positions[msg.sender];
-        
-        // Logic to handle position closing, like releasing collateral
-        // ...
+        uint256 pnl = calculatePnL(position);
 
-        // Reset the position
+        // Adjust collateral based on PnL
+        if (pnl > 0) {
+            collateralToken.transfer(position.trader, position.collateral + pnl);
+        } else {
+            collateralToken.transfer(position.trader, position.collateral);
+        }
+
         delete positions[msg.sender];
     }
 
-    // Add more functions to manage positions, like modifying a position, handling price feeds, etc.
-    // ...
+    function calculatePnL(Position storage position) private view returns (uint256) {
+        uint256 currentMarketValue = getCurrentMarketValue(); // Implement this function
+        uint256 averagePositionPrice = getAveragePositionPrice(); // Implement this function
+
+        if (position.isLong) {
+            return (currentMarketValue - averagePositionPrice) * position.size;
+        } else {
+            return (averagePositionPrice - currentMarketValue) * position.size;
+        }
+    }
+
 }
