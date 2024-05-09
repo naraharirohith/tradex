@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract LiquidityVault is ERC4626 {
     ERC20 public assetToken;  // The token used for deposits (e.g., BTC)
 
-    // Replace with the actual token contract address for the asset (e.g., BTC)
+    // Replace with the actual token contract address for the asset (e.g., USDC)
     constructor(ERC20 _assetToken) 
         ERC4626(_assetToken) {
         assetToken = _assetToken;
@@ -15,6 +15,8 @@ contract LiquidityVault is ERC4626 {
 
     // Function to deposit liquidity
     function depositLiquidity(uint256 amount) external {
+        require(assetToken.balanceOf(msg.sender) >= amount , "Not enough balance");
+
         // Transfer tokens from the user to the contract
         assetToken.transferFrom(msg.sender, address(this), amount);
 
